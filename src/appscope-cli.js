@@ -3,6 +3,19 @@
 import { Command } from "commander";
 import fetch from "node-fetch";
 import open from "open";
+import { 
+  showBanner, 
+  displayTopics, 
+  displayApps, 
+  displayControls, 
+  displayHelp,
+  showSuccess, 
+  showError,
+  showInfo,
+  showFound,
+  createSpinner,
+  showGoodbye
+} from './ui-utils.js';
 
 // Simple article clustering based on title similarity
 function clusterArticles(articles) {
@@ -100,234 +113,170 @@ async function fetchDailyDevFeed(limit = 20) {
   }
 }
 
-function getAppTypeIcon(url) {
-  if (!url) return "🔗";
-  if (url.includes("github.com") || url.includes("gitlab.com")) return "📦";
-  if (url.includes("app.") || url.includes("demo.") || url.includes(".app"))
-    return "📱";
-  if (url.includes("tool") || url.includes("dev")) return "🛠️";
-  return "🌐";
-}
-
-function displayDashboard(clusters, selectedCluster = 0, showHelp = false) {
+function displayDashboard(clusters, selectedCluster = 0, showHelpPanel = false) {
   console.clear();
+  showBanner();
 
-  // Header with improved branding and visual hierarchy
-  console.log(
-    "\n🚀 \x1b[1m\x1b[96mAppScope\x1b[0m \x1b[90m|\x1b[0m \x1b[1m\x1b[37mDiscover Apps, Tools & Projects\x1b[0m"
-  );
-  console.log("\x1b[90m" + "─".repeat(60) + "\x1b[0m");
-  console.log(
-    "\x1b[90m📱 Live apps • 🛠️  Dev tools • 📦 Open source • 🌐 Resources\x1b[0m"
-  );
-
-  // Status indicator
-  const totalApps = clusters.reduce(
-    (sum, cluster) => sum + cluster.articles.length,
-    0
-  );
-  console.log(
-    `\x1b[32m✨ Found ${clusters.length} categories with ${totalApps} apps/tools\x1b[0m`
-  );
-  console.log(
-    "\x1b[90m" +
-      new Date().toLocaleString() +
-      " • Press \x1b[33m?\x1b[90m for help\x1b[0m\n"
-  );
-
-  if (showHelp) {
-    console.log("\x1b[1m\x1b[93m📖 Quick Help:\x1b[0m");
-    console.log("\x1b[90m• \x1b[33m↑↓\x1b[90m arrows to navigate categories");
-    console.log(
-      "\x1b[90m• \x1b[33mo\x1b[90m to open selected app/tool in browser"
-    );
-    console.log(
-      "\x1b[90m• \x1b[33mr\x1b[90m to refresh and get latest content"
-    );
-    console.log("\x1b[90m• \x1b[33m?\x1b[90m to toggle this help");
-    console.log("\x1b[90m• \x1b[33mq\x1b[90m to quit\x1b[0m\n");
+  if (showHelpPanel) {
+    displayHelp();
+    return;
   }
 
-  // Categories list with better visual design
-  console.log("\x1b[1m📂 App Categories:\x1b[0m");
-  clusters.forEach((cluster, i) => {
-    const isSelected = i === selectedCluster;
-    const marker = isSelected ? "\x1b[33m▶\x1b[0m" : " ";
-    const bgColor = isSelected ? "\x1b[44m" : "";
-    const textColor = isSelected ? "\x1b[97m" : "\x1b[96m";
-    const resetColor = "\x1b[0m";
+  // Show app-specific info
+  const totalApps = clusters.reduce((sum, cluster) => sum + cluster.articles.length, 0);
+  showFound(`Found ${clusters.length} categories with ${totalApps} apps/tools`);
 
-    console.log(
-      `${marker} ${bgColor}${textColor} ${cluster.headline} ${resetColor}`
-    );
-  });
+  // Display topics
+  displayTopics(clusters, selectedCluster);
 
-  // Selected category details with app type indicators
+  // Display selected cluster details
   if (clusters[selectedCluster]) {
     const cluster = clusters[selectedCluster];
-    console.log(`\n\x1b[1m🎯 Apps in "${cluster.headline}":\x1b[0m`);
-    cluster.articles.forEach((article, i) => {
-      const icon = getAppTypeIcon(article.url);
-      const title = `\x1b[32m${article.title.slice(0, 70)}${
-        article.title.length > 70 ? "..." : ""
-      }\x1b[0m`;
-
-      console.log(`  ${icon} ${title}`);
-    });
+    displayApps(cluster.articles, cluster.headline);
   }
 
-  // Enhanced controls with visual separation
-  console.log("\n\x1b[90m" + "─".repeat(60) + "\x1b[0m");
-  console.log(
-    "\x1b[1m\x1b[93mControls:\x1b[0m \x1b[33m[↑↓]\x1b[0m Navigate \x1b[33m[o]\x1b[0m Open App \x1b[33m[r]\x1b[0m Refresh \x1b[33m[?]\x1b[0m Help \x1b[33m[q]\x1b[0m Quit"
-  );
-
-  if (
-    clusters[selectedCluster] &&
-    clusters[selectedCluster].articles.length > 0
-  ) {
-    const selectedApp = clusters[selectedCluster].articles[0];
-    console.log(
-      `\x1b[90mReady to open: ${selectedApp.title.slice(0, 50)}...\x1b[0m`
-    );
-  }
+  // Display controls
+  displayControls();
 }
 
 async function runInteractiveDashboard(clusters) {
   let selectedCluster = 0;
-  let showHelp = false;
+  let showHelpPanel = false;
 
   const stdin = process.stdin;
   stdin.setRawMode(true);
   stdin.resume();
   stdin.setEncoding("utf8");
 
-  displayDashboard(clusters, selectedCluster, showHelp);
+  displayDashboard(clusters, selectedCluster, showHelpPanel);
 
   return new Promise((resolve) => {
-    stdin.on("data", async (key) => {
-      if (key === "\u0003" || key === "q") {
-        // Ctrl+C or 'q'
-        stdin.setRawMode(false);
-        console.log(
-          "\n\x1b[32m👋 Thanks for using AppScope! Happy coding!\x1b[0m\n"
-        );
-        resolve();
-        return;
+    const handleKeyPress = async (key) => {
+      try {
+        if (key === "\u0003" || key === "q") {
+          stdin.setRawMode(false);
+          stdin.removeListener('data', handleKeyPress);
+          showGoodbye();
+          resolve();
+          return;
+        }
+
+        if (key === "m") {
+          stdin.setRawMode(false);
+          stdin.removeListener('data', handleKeyPress);
+          resolve('menu');
+          return;
+        }
+
+        if (key === "?") {
+          showHelpPanel = !showHelpPanel;
+          displayDashboard(clusters, selectedCluster, showHelpPanel);
+        } else if (key === "\u001B[A" && selectedCluster > 0) {
+          selectedCluster--;
+          displayDashboard(clusters, selectedCluster, showHelpPanel);
+        } else if (key === "\u001B[B" && selectedCluster < clusters.length - 1) {
+          selectedCluster++;
+          displayDashboard(clusters, selectedCluster, showHelpPanel);
+        } else if (key === "o" && clusters[selectedCluster]) {
+          const app = clusters[selectedCluster].articles[0];
+          console.log(`\nOpening: ${app.title}`);
+          console.log(`${app.url}`);
+          await open(app.url);
+          setTimeout(
+            () => displayDashboard(clusters, selectedCluster, showHelpPanel),
+            2000
+          );
+        } else if (key === "r") {
+          // Simple refresh without complex spinners
+          console.log('\nRefreshing...');
+          try {
+            const articles = await fetchDailyDevFeed();
+            if (articles && articles.length > 0) {
+              clusters = clusterArticles(articles);
+              selectedCluster = 0;
+              console.log('✓ Content refreshed!');
+            } else {
+              console.log('✗ Failed to refresh content');
+            }
+          } catch (error) {
+            console.log('✗ Failed to refresh content');
+          }
+          
+          setTimeout(() => displayDashboard(clusters, selectedCluster, showHelpPanel), 1000);
+        }
+      } catch (error) {
+        // Silently handle any errors and continue
+        displayDashboard(clusters, selectedCluster, showHelpPanel);
       }
+    };
 
-      if (key === "?") {
-        // Toggle help
-        showHelp = !showHelp;
-        displayDashboard(clusters, selectedCluster, showHelp);
-      } else if (key === "\u001B[A" && selectedCluster > 0) {
-        // Up arrow
-        selectedCluster--;
-        displayDashboard(clusters, selectedCluster, showHelp);
-      } else if (key === "\u001B[B" && selectedCluster < clusters.length - 1) {
-        // Down arrow
-        selectedCluster++;
-        displayDashboard(clusters, selectedCluster, showHelp);
-      } else if (key === "o" && clusters[selectedCluster]) {
-        // Open app/tool
-        const app = clusters[selectedCluster].articles[0];
-        const appType =
-          getAppTypeIcon(app.url) === "📦"
-            ? "repository"
-            : getAppTypeIcon(app.url) === "📱"
-            ? "live app"
-            : getAppTypeIcon(app.url) === "🛠️"
-            ? "development tool"
-            : "resource";
-
-        console.log(`\n\x1b[32m🚀 Opening ${appType}: ${app.title}\x1b[0m`);
-        console.log(`\x1b[90m📍 ${app.url}\x1b[0m`);
-        console.log(`\x1b[90m⏳ Loading in your browser...\x1b[0m`);
-
-        await open(app.url);
-        setTimeout(
-          () => displayDashboard(clusters, selectedCluster, showHelp),
-          2000
-        );
-      } else if (key === "r") {
-        // Refresh
-        console.log("\n\x1b[33m🔄 Refreshing app directory...\x1b[0m");
-        console.log("\x1b[90m📡 Fetching latest apps and tools...\x1b[0m");
-
-        const articles = await fetchDailyDevFeed();
-        clusters = clusterArticles(articles);
-        selectedCluster = 0;
-        showHelp = false;
-
-        console.log("\x1b[32m✅ Updated with latest content!\x1b[0m");
-        setTimeout(
-          () => displayDashboard(clusters, selectedCluster, showHelp),
-          1000
-        );
-      }
-    });
+    stdin.on("data", handleKeyPress);
   });
+}
+
+// Export for use by main CLI
+export async function startAppReader(options = {}) {
+  const spinner = createSpinner('Discovering apps, tools & projects...');
+  spinner.start();
+
+  const articles = await fetchDailyDevFeed(parseInt(options.limit || 20));
+  
+  if (articles.length === 0) {
+    spinner.fail();
+    showError("No apps found. Please check your connection and try again.");
+    return;
+  }
+
+  let filteredArticles = articles;
+  if (options.filter) {
+    filteredArticles = articles.filter((article) =>
+      article.title.toLowerCase().includes(options.filter.toLowerCase())
+    );
+    if (filteredArticles.length === 0) {
+      spinner.fail();
+      showError(`No apps found matching "${options.filter}".`);
+      return;
+    }
+    spinner.stop();
+    showFound(`Filtered by "${options.filter}" - ${filteredArticles.length} matches`);
+  } else {
+    spinner.stop();
+    showFound(`Found ${articles.length} apps/tools`);
+  }
+
+  const clusters = clusterArticles(filteredArticles);
+  if (clusters.length === 0) {
+    showError("No apps found matching your criteria.");
+    return;
+  }
+
+  const totalApps = clusters.reduce((sum, cluster) => sum + cluster.articles.length, 0);
+  showFound(`Organized into ${clusters.length} categories with ${totalApps} apps/tools`);
+  
+  setTimeout(async () => {
+    const result = await runInteractiveDashboard(clusters);
+    if (result === 'menu') {
+      return; // Return to main menu
+    }
+  }, 1000);
 }
 
 const program = new Command();
 
 program
-  .name("appscope")
-  .description(
-    "🚀 Terminal directory for apps, tools & projects - Open real apps instantly!"
-  )
-  .version("1.0.0")
+  .name("techscope-apps")
+  .description("Terminal directory for apps, tools & projects")
+  .version("2.0.0")
   .option(
     "-f, --filter <keyword>",
     'Filter by tech (e.g., "react", "ai", "tool")'
   )
   .option("-l, --limit <number>", "Number of items to discover", "20")
   .action(async (options) => {
-    console.log(
-      "\x1b[96m🚀 AppScope\x1b[0m - \x1b[37mDiscovering apps, tools & projects...\x1b[0m"
-    );
-    console.log("\x1b[90m📡 Fetching from developer community...\x1b[0m\n");
-
-    const articles = await fetchDailyDevFeed(parseInt(options.limit));
-
-    if (articles.length === 0) {
-      console.log(
-        "\x1b[31m❌ No apps found. Please check your connection and try again.\x1b[0m"
-      );
-      return;
-    }
-
-    let filteredArticles = articles;
-    if (options.filter) {
-      filteredArticles = articles.filter((article) =>
-        article.title.toLowerCase().includes(options.filter.toLowerCase())
-      );
-      console.log(
-        `\x1b[96m🔍 Filtered by "${options.filter}" - found ${filteredArticles.length} matches\x1b[0m`
-      );
-    }
-
-    const clusters = clusterArticles(filteredArticles);
-
-    if (clusters.length === 0) {
-      console.log("\x1b[31m❌ No apps found matching your criteria.\x1b[0m");
-      return;
-    }
-
-    const totalApps = clusters.reduce(
-      (sum, cluster) => sum + cluster.articles.length,
-      0
-    );
-    console.log(
-      `\x1b[32m✨ Ready! Found ${clusters.length} categories with ${totalApps} apps/tools\x1b[0m`
-    );
-    console.log(
-      '\x1b[90m🎯 Use arrow keys to navigate, "o" to open apps, "?" for help\x1b[0m\n'
-    );
-
-    setTimeout(async () => {
-      await runInteractiveDashboard(clusters);
-    }, 1500);
+    await startAppReader(options);
   });
 
-program.parse();
+// Only run if this file is executed directly
+if (import.meta.url === `file://${process.argv[1]}`) {
+  program.parse();
+}

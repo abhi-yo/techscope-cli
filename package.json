@@ -1,35 +1,41 @@
 {
   "name": "techscope-cli",
-  "version": "1.0.3",
-  "description": "Terminal-based tech news reader with smart clustering",
+  "version": "1.1.0",
+  "description": "Terminal-based tech news reader with smart clustering and unified interface",
   "type": "module",
-  "main": "src/newscope-cli.js",
+  "main": "src/techscope-main.js",
   "bin": {
-    "techscope": "src/newscope-cli.js",
-    "techscope-news": "src/newscope-cli.js",
-    "techscope-apps": "src/appscope-cli.js"
+    "techscope": "src/techscope-main.js"
   },
   "files": [
+    "src/techscope-main.js",
+    "src/unified-cli.js",
+    "src/ui-utils.js",
     "src/newscope-cli.js",
     "src/appscope-cli.js",
-    "README-CLI.md"
+    "README.md"
   ],
-      "keywords": [
-      "cli",
-      "news",
-      "terminal",
-      "tech",
-      "hacker-news",
-      "developer",
-      "tools",
-      "apps"
-    ],
-    "author": "TechScope",
+  "keywords": [
+    "cli",
+    "news",
+    "terminal",
+    "tech",
+    "hacker-news",
+    "developer",
+    "tools",
+    "apps"
+  ],
+  "author": "TechScope",
   "license": "MIT",
   "dependencies": {
+    "chalk": "^5.6.2",
     "commander": "^14.0.0",
+    "figlet": "^1.9.1",
+    "gradient-string": "^3.0.0",
+    "inquirer": "^12.9.4",
     "node-fetch": "^3.3.2",
-    "open": "^10.2.0"
+    "open": "^10.2.0",
+    "ora": "^8.2.0"
   },
   "engines": {
     "node": ">=18.0.0"

@@ -3,6 +3,19 @@
 import { Command } from "commander";
 import fetch from "node-fetch";
 import open from "open";
+import { 
+  showBanner, 
+  displayTopics, 
+  displayArticles, 
+  displayControls, 
+  displayHelp,
+  showSuccess, 
+  showError,
+  showInfo,
+  showFound,
+  createSpinner,
+  showGoodbye
+} from './ui-utils.js';
 
 // Simple article clustering based on title similarity
 function clusterArticles(articles) {
@@ -100,155 +113,165 @@ async function fetchDailyTechFeed(limit = 20) {
   }
 }
 
-function displayDashboard(clusters, selectedCluster = 0, showHelp = false) {
+function displayDashboard(clusters, selectedCluster = 0, showHelpPanel = false) {
   console.clear();
+  showBanner();
 
-  // Header
-  console.log("\n🚀 \x1b[1m\x1b[36mTechScope - Tech Content Dashboard\x1b[0m");
-  console.log("\x1b[90m" + "─".repeat(60) + "\x1b[0m");
-  console.log("\x1b[90mDiscover trending tech content in your terminal\x1b[0m");
-  console.log(
-    "\x1b[90m" +
-      new Date().toLocaleString() +
-      " • Press \x1b[33m?\x1b[90m for help\x1b[0m\n"
-  );
-
-  if (showHelp) {
-    console.log("\x1b[1m\x1b[93m📖 Quick Help:\x1b[0m");
-    console.log("\x1b[90m• \x1b[33m↑↓\x1b[90m navigate topics");
-    console.log("\x1b[90m• \x1b[33mo\x1b[90m open selected link");
-    console.log("\x1b[90m• \x1b[33mr\x1b[90m refresh");
-    console.log("\x1b[90m• \x1b[33mq\x1b[90m quit\x1b[0m\n");
+  if (showHelpPanel) {
+    displayHelp();
+    return;
   }
 
-  // Topics list
-  console.log("\x1b[1m🔥 Topics:\x1b[0m");
-  clusters.forEach((cluster, i) => {
-    const isSelected = i === selectedCluster;
-    const marker = isSelected ? "\x1b[33m▶\x1b[0m" : " ";
-    const bgColor = isSelected ? "\x1b[44m" : "";
-    const textColor = isSelected ? "\x1b[97m" : "\x1b[96m";
-    const resetColor = "\x1b[0m";
-    console.log(
-      `${marker} ${bgColor}${textColor} ${cluster.headline} ${resetColor}`
-    );
-  });
+  // Display topics
+  displayTopics(clusters, selectedCluster);
 
-  // Selected cluster details (no type/date line)
+  // Display selected cluster details
   if (clusters[selectedCluster]) {
     const cluster = clusters[selectedCluster];
-    console.log(`\n\x1b[1m🔗 Content in "${cluster.headline}":\x1b[0m`);
-    cluster.articles.forEach((article, i) => {
-      const isRepo =
-        article.url &&
-        (article.url.includes("github.com") ||
-          article.url.includes("gitlab.com"));
-      const icon = isRepo ? "📦" : "🔗";
-      const title = `\x1b[32m${article.title.slice(0, 70)}${
-        article.title.length > 70 ? "..." : ""
-      }\x1b[0m`;
-      console.log(`  ${icon} ${title}`);
-    });
+    displayArticles(cluster.articles, cluster.headline);
   }
 
-  // Controls
-  console.log("\n\x1b[90m" + "─".repeat(60) + "\x1b[0m");
-  console.log(
-    "\x1b[1m\x1b[93mControls:\x1b[0m \x1b[33m[↑↓]\x1b[0m Navigate \x1b[33m[o]\x1b[0m Open \x1b[33m[r]\x1b[0m Refresh \x1b[33m[?]\x1b[0m Help \x1b[33m[q]\x1b[0m Quit"
-  );
+  // Display controls
+  displayControls();
 }
 
 async function runInteractiveDashboard(clusters) {
   let selectedCluster = 0;
-  let showHelp = false;
+  let showHelpPanel = false;
 
   const stdin = process.stdin;
   stdin.setRawMode(true);
   stdin.resume();
   stdin.setEncoding("utf8");
 
-  displayDashboard(clusters, selectedCluster, showHelp);
+  displayDashboard(clusters, selectedCluster, showHelpPanel);
 
   return new Promise((resolve) => {
-    stdin.on("data", async (key) => {
-      if (key === "\u0003" || key === "q") {
-        stdin.setRawMode(false);
-        console.log("\n\x1b[32m👋 Goodbye!\x1b[0m\n");
-        resolve();
-        return;
-      }
+    const handleKeyPress = async (key) => {
+      try {
+        if (key === "\u0003" || key === "q") {
+          stdin.setRawMode(false);
+          stdin.removeListener('data', handleKeyPress);
+          showGoodbye();
+          resolve();
+          return;
+        }
 
-      if (key === "?") {
-        showHelp = !showHelp;
-        displayDashboard(clusters, selectedCluster, showHelp);
-      } else if (key === "\u001B[A" && selectedCluster > 0) {
-        selectedCluster--;
-        displayDashboard(clusters, selectedCluster, showHelp);
-      } else if (key === "\u001B[B" && selectedCluster < clusters.length - 1) {
-        selectedCluster++;
-        displayDashboard(clusters, selectedCluster, showHelp);
-      } else if (key === "o" && clusters[selectedCluster]) {
-        const article = clusters[selectedCluster].articles[0];
-        console.log(`\n\x1b[32mOpening: ${article.title}\x1b[0m`);
-        console.log(`\x1b[90m→ ${article.url}\x1b[0m`);
-        await open(article.url);
-        setTimeout(
-          () => displayDashboard(clusters, selectedCluster, showHelp),
-          1500
-        );
-      } else if (key === "r") {
-        console.log("\n\x1b[33mRefreshing...\x1b[0m");
-        const articles = await fetchDailyTechFeed();
-        clusters = clusterArticles(articles);
-        selectedCluster = 0;
-        displayDashboard(clusters, selectedCluster, showHelp);
+        if (key === "m") {
+          stdin.setRawMode(false);
+          stdin.removeListener('data', handleKeyPress);
+          resolve('menu');
+          return;
+        }
+
+        if (key === "?") {
+          showHelpPanel = !showHelpPanel;
+          displayDashboard(clusters, selectedCluster, showHelpPanel);
+        } else if (key === "\u001B[A" && selectedCluster > 0) {
+          selectedCluster--;
+          displayDashboard(clusters, selectedCluster, showHelpPanel);
+        } else if (key === "\u001B[B" && selectedCluster < clusters.length - 1) {
+          selectedCluster++;
+          displayDashboard(clusters, selectedCluster, showHelpPanel);
+        } else if (key === "o" && clusters[selectedCluster]) {
+          const article = clusters[selectedCluster].articles[0];
+          console.log(`\nOpening: ${article.title}`);
+          console.log(`${article.url}`);
+          await open(article.url);
+          setTimeout(
+            () => displayDashboard(clusters, selectedCluster, showHelpPanel),
+            1500
+          );
+        } else if (key === "r") {
+          // Simple refresh without complex spinners
+          console.log('\nRefreshing...');
+          try {
+            const articles = await fetchDailyTechFeed();
+            if (articles && articles.length > 0) {
+              clusters = clusterArticles(articles);
+              selectedCluster = 0;
+              console.log('✓ Content refreshed!');
+            } else {
+              console.log('✗ Failed to refresh content');
+            }
+          } catch (error) {
+            console.log('✗ Failed to refresh content');
+          }
+          
+          setTimeout(() => displayDashboard(clusters, selectedCluster, showHelpPanel), 1000);
+        }
+      } catch (error) {
+        // Silently handle any errors and continue
+        displayDashboard(clusters, selectedCluster, showHelpPanel);
       }
-    });
+    };
+
+    stdin.on("data", handleKeyPress);
   });
+}
+
+// Export for use by main CLI
+export async function startNewsReader(options = {}) {
+  const spinner = createSpinner('Fetching tech news...');
+  spinner.start();
+
+  const articles = await fetchDailyTechFeed(parseInt(options.limit || 20));
+  
+  if (articles.length === 0) {
+    spinner.fail();
+    showError("No content found.");
+    return;
+  }
+
+  let filteredArticles = articles;
+  if (options.filter) {
+    filteredArticles = articles.filter((article) =>
+      article.title.toLowerCase().includes(options.filter.toLowerCase())
+    );
+    if (filteredArticles.length === 0) {
+      spinner.fail();
+      showError(`No content found matching "${options.filter}".`);
+      return;
+    }
+    spinner.stop();
+    showFound(`Filtered by "${options.filter}" - ${filteredArticles.length} matches`);
+  } else {
+    spinner.stop();
+    showFound(`Found ${articles.length} articles`);
+  }
+
+  const clusters = clusterArticles(filteredArticles);
+  if (clusters.length === 0) {
+    showError("No content found matching your criteria.");
+    return;
+  }
+
+  showFound(`Organized into ${clusters.length} topics`);
+  
+  setTimeout(async () => {
+    const result = await runInteractiveDashboard(clusters);
+    if (result === 'menu') {
+      return; // Return to main menu
+    }
+  }, 1000);
 }
 
 const program = new Command();
 
 program
-  .name("techscope")
-  .description("Terminal-based tech content reader")
-  .version("1.0.0")
+  .name("techscope-news")
+  .description("Terminal-based tech news reader")
+  .version("2.0.0")
   .option(
     "-f, --filter <keyword>",
     'Filter by keyword (e.g., "react", "ai", "rust")'
   )
   .option("-l, --limit <number>", "Number of items to fetch", "20")
   .action(async (options) => {
-    console.log("\x1b[33m🔍 Fetching tech news...\x1b[0m");
-
-    const articles = await fetchDailyTechFeed(parseInt(options.limit));
-    if (articles.length === 0) {
-      console.log("\x1b[31m❌ No content found.\x1b[0m");
-      return;
-    }
-
-    let filteredArticles = articles;
-    if (options.filter) {
-      filteredArticles = articles.filter((article) =>
-        article.title.toLowerCase().includes(options.filter.toLowerCase())
-      );
-      console.log(
-        `\x1b[36m🔎 Filtered by "${options.filter}" - ${filteredArticles.length} matches\x1b[0m`
-      );
-    }
-
-    const clusters = clusterArticles(filteredArticles);
-    if (clusters.length === 0) {
-      console.log("\x1b[31m❌ No content found matching your criteria.\x1b[0m");
-      return;
-    }
-
-    console.log(
-      `\x1b[32m✅ Found ${clusters.length} topics with ${filteredArticles.length} items\x1b[0m`
-    );
-    setTimeout(async () => {
-      await runInteractiveDashboard(clusters);
-    }, 1000);
+    await startNewsReader(options);
   });
 
-program.parse();
+// Only run if this file is executed directly
+if (import.meta.url === `file://${process.argv[1]}`) {
+  program.parse();
+}
